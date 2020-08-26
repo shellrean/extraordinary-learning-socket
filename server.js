@@ -10,50 +10,74 @@ app.use(bodyParser.json());
 let io = require('socket.io').listen(app.listen(3000));
 
 io.sockets.on('connection', function(socket) {
-	socket.on('getin', function(payload) {
+	/**
+	  * Get current user list in room
+	  *
+	  * @emit monit
+	  */
+	socket.on('monitor', function(payload) {
+		let socs = io.sockets.connected;
+		io.of('/').in(payload.channel).clients((error, clients) => {
+			if (error) throw error;
+			let client_rooms = Object.values(clients);
 
+			io.in(socket.channel).emit('monit', Object.values(socs).filter(item => item.channel != null && client_rooms.indexOf(item.id) != -1).map(item => item.user))
+		});
+	})
+
+	/**
+	 * Assign user to room
+	 *
+	 * @emit is_online
+	 */
+	socket.on('getin', function(payload) {
 		socket.user = payload.user
 		socket.channel = payload.channel
 		socket.token = payload.token
-		io.emit('is_online_'+socket.channel, payload.user);
+
+		socket.join(socket.channel)
+		// console.log((typeof socket.user != 'undefined' ? socket.user.email : 'Anonymous')+' Join to '+socket.channel)
+		io.in(socket.channel).emit(`is_online`, payload.user);
 	})
 
-	socket.on('change_message', function(payload) {
-
-	})
-
+	/**
+	 * Assign comment user to room
+	 *
+	 * @emit comment
+	 */
 	socket.on('comment', function(payload) {
-		io.emit('comment_'+socket.channel, payload.comment)
+		io.in(socket.channel).emit('comment',payload.comment)
 	})
 
+	/**
+	 * Close classroom live
+	 *
+	 * @emmit close
+	 */
+	 socket.on('close_classroom', function() {
+	 	io.in(socket.channel).emit('close_classroom')
+	 })
+
+	/**
+	 * Disconnect user to room
+	 *
+	 * @emit is_offline
+	 */
 	socket.on('disconnect', function(username) {
-		io.emit('is_offline_'+socket.channel, socket.user);
-		axios.post(`http://localhost:8000/api/v1/channels/0/user`, {}, {
-			headers: {
-				'Accept': 'application/json',
-				'Authorization': `Bearer ${socket.token}` 
-			}
-		}).then((res) => {
-			console.log(`statusCode: ${res.data.message}`)
-		})
-		.catch((err) => {
-			console.log(err.response.data)
-		})
+		io.in(socket.channel).emit('is_offline', socket.user);
+		socket.leave(socket.channel);
 	})
 
+	/**
+	 * Exit user to room
+	 *
+	 * @emit is_offline
+	 */
 	socket.on('exit', function(payload) {
-		io.emit('is_offline_'+socket.channel, socket.user);
-		axios.post(`http://localhost:8000/api/v1/channels/0/user`, {}, {
-			headers: {
-				'Accept': 'application/json',
-				'Authorization': `Bearer ${socket.token}` 
-			}
-		}).then((res) => {
-			console.log(`statusCode: ${res.data.message}`)
-		})
-		.catch((err) => {
-			console.log(err.response.data)
-		})
+		// console.log((typeof socket.user != 'undefined' ? socket.user.email : 'Anonymous')+' leave from '+socket.channel)
+		io.in(socket.channel).emit('is_offline', socket.user);
+		socket.leave(socket.channel);
 	})
 })
+
 console.log('Server run on port 3000')
