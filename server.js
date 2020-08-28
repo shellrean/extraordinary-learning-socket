@@ -1,15 +1,33 @@
 const express = require('express')
 const bodyParser = require('body-parser')
 const http = require('http');
-const axios = require('axios')
-
+const RTCMultiConnectionServer = require('rtcmulticonnection-server')
 const app = express();
 
 app.use(bodyParser.json());
 
-let io = require('socket.io').listen(app.listen(3000));
+var PORT = 3000;
+
+const jsonPath = {
+	config: 'config.json',
+	logs: 'logs.json'
+}
+
+const BASH_COLORS_HELPER = RTCMultiConnectionServer.BASH_COLORS_HELPER;
+const getValuesFromConfigJson = RTCMultiConnectionServer.getValuesFromConfigJson;
+const getBashParameters = RTCMultiConnectionServer.getBashParameters;
+
+var config = getValuesFromConfigJson(jsonPath);
+config = getBashParameters(config, BASH_COLORS_HELPER);
+
+let io = require('socket.io').listen(app.listen(PORT, function() {
+	console.log(`Server run on port ${PORT}`);
+}));
 
 io.sockets.on('connection', function(socket) {
+
+	RTCMultiConnectionServer.addSocket(socket, config);
+
 	/**
 	  * Get current user list in room
 	  *
@@ -79,5 +97,3 @@ io.sockets.on('connection', function(socket) {
 		socket.leave(socket.channel);
 	})
 })
-
-console.log('Server run on port 3000')
